@@ -29,6 +29,18 @@ export class ChatRoom extends DurableObject {
     });
   }
 
+  async broadcast(data) {
+    const message = JSON.stringify(data);
+
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(message);
+      } catch (error) {
+        console.error("Error enviando mensaje:", error);
+      }
+    }
+  }
+
   async webSocketMessage(ws, message) {
     try {
       const data = JSON.parse(message);
@@ -45,7 +57,7 @@ export class ChatRoom extends DurableObject {
   }
 
   webSocketClose(ws, code, reason) {
-    ws.close(code, reason);
+    console.log("WebSocket desconectado:", code, reason);
   }
 
   webSocketError(ws, error) {
