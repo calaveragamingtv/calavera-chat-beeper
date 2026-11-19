@@ -1,1 +1,19 @@
+{
+  "app_name": "Calavera Chat Beeper",
+  "version": "1.0.0",
+  "platforms": {
+    "twitch": {
+      "enabled": true
+    },
+    "kick": {
+      "enabled": true
+    }
+  },
+  "audio": {
+    "enabled": true,
+    "volume": 0.7,
+    "new_viewer_sound": true
+  },
+  "stream_only": true
+}
 
