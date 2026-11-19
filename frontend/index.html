@@ -3,10 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>Calavera Chat Beeper</title>
+
+  <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
-  <h1>Calavera Chat Beeper</h1>
-  <p>Servicio inicializado.</p>
+
+  <main class="container">
+
+    <h1>CALAVERA CHAT BEEPER</h1>
+
+    <p class="subtitle">
+      Notificaciones de chat para tus streams
+    </p>
+
+    <div class="status">
+      <span>Cloudflare</span>
+      <span id="connectionStatus" class="status-value">
+        Desconectado
+      </span>
+    </div>
+
+    <div class="status">
+      <span>Notificaciones</span>
+      <span id="audioStatus" class="status-value">
+        Desactivadas
+      </span>
+    </div>
+
+    <button id="connectButton">
+      CONECTAR
+    </button>
+
+    <button id="audioButton" class="secondary">
+      ACTIVAR SONIDO
+    </button>
+
+    <div class="settings">
+
+      <label for="volume">
+        Volumen: <span id="volumeValue">70%</span>
+      </label>
+
+      <input
+        type="range"
+        id="volume"
+        min="0"
+        max="100"
+        value="70"
+      >
+
+      <button id="testButton" class="secondary" disabled>
+        PROBAR BEEP
+      </button>
+
+    </div>
+
+    <div class="messages">
+      <strong>Actividad</strong>
+      <div id="activity">
+        Esperando conexión...
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module" src="/js/app.js"></script>
+
 </body>
 </html>
