@@ -1,1 +1,7 @@
+name = "calavera-chat-beeper"
+main = "src/index.js"
+compatibility_date = "2026-11-19"
 
+[assets]
+directory = "../frontend"
+binding = "ASSETS"
