@@ -6,7 +6,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Health check
     if (url.pathname === "/health") {
       return Response.json({
         status: "ok",
@@ -15,76 +14,22 @@ export default {
       });
     }
 
-    // Twitch EventSub endpoint
-    if (url.pathname === "/webhooks/twitch" && request.method === "POST") {
+    if (
+      url.pathname === "/webhooks/twitch" &&
+      request.method === "POST"
+    ) {
       return handleTwitchWebhook(request, env);
     }
 
-    // WebSocket connection
     if (url.pathname === "/ws") {
       const id = env.CHAT_ROOM.idFromName("main");
       const room = env.CHAT_ROOM.get(id);
-
       return room.fetch(request);
     }
 
-    // Frontend
     return env.ASSETS.fetch(request);
   }
 };
-
-async function handleTwitchWebhook(request, env) {
-  const messageType = request.headers.get(
-    "Twitch-Eventsub-Message-Type"
-  );
-
-  const body = await request.text();
-
-  // Subscription verification
-  if (messageType === "webhook_callback_verification") {
-    const data = JSON.parse(body);
-
-    return new Response(data.challenge, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain"
-      }
-    });
-  }
-
-  // Notifications
-  if (messageType === "notification") {
-    const data = JSON.parse(body);
-
-    if (data.subscription?.type === "channel.chat.message") {
-      const message = data.event?.message?.text;
-
-      if (message) {
-        const id = env.CHAT_ROOM.idFromName("main");
-        const room = env.CHAT_ROOM.get(id);
-
-        await room.broadcast({
-          type: "chat_message",
-          platform: "twitch",
-          message
-        });
-      }
-    }
-
-    return new Response("OK", { status: 200 });
-  }
-
-  // Revocation
-  if (messageType === "revocation") {
-    console.log("Twitch subscription revoked:", body);
-    return new Response("OK", { status: 200 });
-  }
-
-  return new Response("Unsupported EventSub message", {
-    status: 400
-  });
-}
-
 
 async function handleTwitchWebhook(request, env) {
   const body = await request.text();
@@ -112,7 +57,6 @@ async function handleTwitchWebhook(request, env) {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  // Subscription verification
   if (messageType === "webhook_callback_verification") {
     return new Response(data.challenge, {
       status: 200,
@@ -122,7 +66,6 @@ async function handleTwitchWebhook(request, env) {
     });
   }
 
-  // Chat notifications
   if (messageType === "notification") {
     if (data.subscription?.type === "channel.chat.message") {
       const message = data.event?.message?.text;
@@ -142,7 +85,6 @@ async function handleTwitchWebhook(request, env) {
     return new Response("OK", { status: 200 });
   }
 
-  // Subscription revoked
   if (messageType === "revocation") {
     console.log("Twitch subscription revoked:", body);
     return new Response("OK", { status: 200 });
@@ -175,7 +117,6 @@ async function verifyTwitchSignature(request, body, secret) {
     return false;
   }
 
-  // Reject messages older than 10 minutes or too far in the future
   const messageTime = Date.parse(timestamp);
 
   if (
@@ -225,4 +166,3 @@ async function verifyTwitchSignature(request, body, secret) {
 
   return difference === 0;
 }
-
