@@ -5,3 +5,11 @@ compatibility_date = "2026-11-19"
 [assets]
 directory = "../frontend"
 binding = "ASSETS"
+
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[exports.ChatRoom]
+type = "durable-object"
+storage = "sqlite"
