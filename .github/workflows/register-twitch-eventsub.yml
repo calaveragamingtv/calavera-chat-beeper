@@ -1,0 +1,169 @@
+name: Register Twitch EventSub
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Register Twitch chat subscription
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          TWITCH_AUTH_CODE: ${{ secrets.TWITCH_AUTH_CODE }}
+          TWITCH_EVENTSUB_SECRET: ${{ secrets.TWITCH_EVENTSUB_SECRET }}
+        run: |
+          node <<'NODE'
+          const clientId = process.env.TWITCH_CLIENT_ID;
+          const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+          const authCode = process.env.TWITCH_AUTH_CODE;
+          const webhookSecret = process.env.TWITCH_EVENTSUB_SECRET;
+
+          const redirectUri = "http://localhost";
+          const callbackUrl =
+            "https://calavera-chat-beeper.calavera666-gaming.workers.dev/webhooks/twitch";
+
+          async function request(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${JSON.stringify(data)}`
+              );
+            }
+
+            return data;
+          }
+
+          async function main() {
+            if (!clientId || !clientSecret || !authCode || !webhookSecret) {
+              throw new Error("Faltan secretos de GitHub.");
+            }
+
+            console.log("1. Intercambiando código OAuth...");
+
+            const userToken = await request(
+              "https://id.twitch.tv/oauth2/token",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  code: authCode,
+                  grant_type: "authorization_code",
+                  redirect_uri: redirectUri
+                })
+              }
+            );
+
+            const requiredScopes = [
+              "user:read:chat",
+              "user:bot",
+              "channel:bot"
+            ];
+
+            const grantedScopes = userToken.scope || [];
+            const missingScopes = requiredScopes.filter(
+              scope => !grantedScopes.includes(scope)
+            );
+
+            if (missingScopes.length) {
+              throw new Error(
+                `Faltan permisos OAuth: ${missingScopes.join(", ")}`
+              );
+            }
+
+            console.log("Autorización OAuth confirmada.");
+
+            console.log("2. Generando App Access Token...");
+
+            const appToken = await request(
+              "https://id.twitch.tv/oauth2/token",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  grant_type: "client_credentials"
+                })
+              }
+            );
+
+            console.log("App Access Token generado.");
+
+            console.log("3. Buscando cuenta CalaveraGamingTV...");
+
+            const userData = await request(
+              "https://api.twitch.tv/helix/users?login=calaveragamingtv",
+              {
+                headers: {
+                  "Client-Id": clientId,
+                  "Authorization": `Bearer ${appToken.access_token}`
+                }
+              }
+            );
+
+            if (!userData.data?.length) {
+              throw new Error("No se encontró CalaveraGamingTV.");
+            }
+
+            const broadcasterId = userData.data[0].id;
+
+            console.log("Cuenta encontrada.");
+
+            console.log("4. Creando suscripción EventSub...");
+
+            const subscription = await request(
+              "https://api.twitch.tv/helix/eventsub/subscriptions",
+              {
+                method: "POST",
+                headers: {
+                  "Client-Id": clientId,
+                  "Authorization": `Bearer ${appToken.access_token}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  type: "channel.chat.message",
+                  version: "1",
+                  condition: {
+                    broadcaster_user_id: broadcasterId,
+                    user_id: broadcasterId
+                  },
+                  transport: {
+                    method: "webhook",
+                    callback: callbackUrl,
+                    secret: webhookSecret
+                  }
+                })
+              }
+            );
+
+            const created = subscription.data?.[0];
+
+            if (!created) {
+              throw new Error("Twitch no devolvió la suscripción creada.");
+            }
+
+            console.log("Suscripción registrada correctamente.");
+            console.log("Tipo:", created.type);
+            console.log("Estado:", created.status);
+            console.log("ID:", created.id);
+          }
+
+          main().catch(error => {
+            console.error("ERROR:", error.message);
+            process.exit(1);
+          });
+          NODE
