@@ -29,7 +29,22 @@ export class ChatRoom extends DurableObject {
     });
   }
 
-  webSocketClose(ws, code, reason, wasClean) {
+  async webSocketMessage(ws, message) {
+    try {
+      const data = JSON.parse(message);
+
+      if (data.type === "test") {
+        ws.send(JSON.stringify({
+          type: "test_message",
+          message: "Prueba de sonido"
+        }));
+      }
+    } catch (error) {
+      console.error("Error procesando mensaje:", error);
+    }
+  }
+
+  webSocketClose(ws, code, reason) {
     ws.close(code, reason);
   }
 
