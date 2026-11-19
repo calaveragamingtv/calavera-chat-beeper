@@ -69,6 +69,13 @@ connectButton.addEventListener("click", () => {
       playBeep();
       log("Beep de prueba recibido.");
     }
+
+    if (data.type === "chat_message") {
+      playBeep();
+      log(`[${data.platform.toUpperCase()}] ${data.message}`);
+    }
+
+    
   }, updateConnection);
 });
 
