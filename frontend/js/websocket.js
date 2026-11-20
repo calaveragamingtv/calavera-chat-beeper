@@ -1,6 +1,23 @@
-let socket = null;
 
-export function connectWebSocket(onMessage, onStatus) {
+let socket = null;
+let retryTimer = null;
+let reconnectAttempts = 0;
+let manuallyDisconnected = false;
+
+let messageHandler = null;
+let statusHandler = null;
+
+const RECONNECT_DELAYS = [
+  2000,
+  4000,
+  8000,
+  16000,
+  30000
+];
+
+function createConnection() {
+  if (manuallyDisconnected) return;
+
   if (
     socket &&
     (socket.readyState === WebSocket.OPEN ||
@@ -12,37 +29,107 @@ export function connectWebSocket(onMessage, onStatus) {
   const protocol =
     location.protocol === "https:" ? "wss:" : "ws:";
 
-  socket = new WebSocket(
+  const ws = new WebSocket(
     `${protocol}//${location.host}/ws`
   );
 
-  socket.onopen = () => {
-    onStatus("Conectado");
+  socket = ws;
+
+  ws.onopen = () => {
+    if (socket !== ws) return;
+
+    reconnectAttempts = 0;
+
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    statusHandler?.("Conectado");
   };
 
-  socket.onmessage = (event) => {
+  ws.onmessage = (event) => {
+    if (socket !== ws) return;
+
     try {
       const data = JSON.parse(event.data);
-      onMessage(data);
+      messageHandler?.(data);
     } catch (error) {
       console.error("Mensaje inválido:", error);
     }
   };
 
-  socket.onclose = () => {
-    onStatus("Desconectado");
+  ws.onclose = () => {
+    if (socket !== ws) return;
+
+    socket = null;
+
+    if (manuallyDisconnected) return;
+
+    statusHandler?.("Desconectado");
+
+    scheduleReconnect();
   };
 
-  socket.onerror = () => {
-    onStatus("Error de conexión");
+  ws.onerror = () => {
+    if (socket !== ws) return;
+
+    statusHandler?.("Error de conexión");
   };
 }
 
+function scheduleReconnect() {
+  if (manuallyDisconnected || retryTimer) return;
+
+  const index = Math.min(
+    reconnectAttempts,
+    RECONNECT_DELAYS.length - 1
+  );
+
+  const delay = RECONNECT_DELAYS[index];
+
+  reconnectAttempts++;
+
+  statusHandler?.("Reconectando...");
+
+  console.log(
+    `WebSocket: nuevo intento en ${delay / 1000} segundos`
+  );
+
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    createConnection();
+  }, delay);
+}
+
+export function connectWebSocket(onMessage, onStatus) {
+  messageHandler = onMessage;
+  statusHandler = onStatus;
+
+  manuallyDisconnected = false;
+
+  if (retryTimer) return;
+
+  createConnection();
+}
+
 export function disconnectWebSocket() {
-  if (socket) {
-    socket.close();
-    socket = null;
+  manuallyDisconnected = true;
+
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
   }
+
+  if (socket) {
+    const currentSocket = socket;
+    socket = null;
+    currentSocket.close();
+  }
+
+  reconnectAttempts = 0;
+
+  statusHandler?.("Desconectado");
 }
 
 export function sendMessage(data) {
